@@ -38,7 +38,7 @@ class dbExport:
                               fg="white",
                               bd=5, relief=GROOVE)
         srvFrame.place(x=0, y=0, width=400, height=50)
-        self.Combo = Combobox(srvFrame, width=27, textvariable=StringVar(), values=['MSSQL Server 2022', 'Oracle 21c'])
+        self.Combo = Combobox(srvFrame, width=27, textvariable=StringVar(), values=['MSSQL Server 2022', 'Oracle 21c', 'MySQL Server', 'PostgreSQL Server'])
         self.Combo.set("")
         self.Combo.bind('<<ComboboxSelected>>', self.getAllSchemas)
         self.Combo.pack(side=TOP, fill=Y)
@@ -48,7 +48,7 @@ class dbExport:
                                  bd=5, relief=GROOVE)
         schemaFrame.place(x=0, y=55, width=400, height=60)
         self.schemaCombo = Combobox(schemaFrame, width=27, textvariable=StringVar(),
-                                    values=['MSSQL Server 2022', 'Oracle 21c'])
+                                    values=[''])
         self.schemaCombo.set("")
         self.schemaCombo.bind('<<ComboboxSelected>>', self.getAllTables)
         self.schemaCombo.pack(side=TOP, fill=Y)
@@ -89,8 +89,8 @@ class dbExport:
                                   bd=5, relief=GROOVE)
         tblListframe.place(x=450, y=0, width=400, height=200)
         scroll_y = Scrollbar(tblListframe, orient=VERTICAL)
-        self.LB = Listbox(tblListframe, yscrollcommand=scroll_y.set, selectbackground="#B0FC38", selectmode=EXTENDED,
-                          font=("arial", 12, "bold"), bg="#CF9FFF", fg="navyblue", bd=5, relief=GROOVE)
+        self.LB = Listbox(tblListframe, yscrollcommand=scroll_y.set, selectbackground="#8d8df6", selectmode=EXTENDED,
+                          font=("arial", 12, "bold"), bg="#c9f56f", fg="navyblue", bd=5, relief=GROOVE)
         scroll_y.config(command=self.LB.yview)
         scroll_y.pack(side=RIGHT, fill=Y)
         self.LB.bind('<<ListboxSelect>>', self.items_selected)
@@ -106,6 +106,12 @@ class dbExport:
         elif self.Combo.get() == "Oracle 21c":
             for row in result:
                 row_to_list.append(row[0])
+        elif self.Combo.get() == "MySQL Server":
+            for row in result:
+                row_to_list.append(row.table_name)
+        elif self.Combo.get() == "PostgreSQL Server":
+            for row in result:
+                row_to_list.append(row.table_name)
         return row_to_list
 
     def convertCursorRowToListForSchema(self, result: list):
@@ -117,6 +123,12 @@ class dbExport:
         elif self.Combo.get() == "Oracle 21c":
             for row in result:
                 row_to_list.append(row[0])
+        elif self.Combo.get() == "MySQL Server":
+            for row in result:
+                row_to_list.append(row.dbname)
+        elif self.Combo.get() == "PostgreSQL Server":
+            for row in result:
+                row_to_list.append(row.dbname)
         return row_to_list
 
     def convertCursorRowToListForColumn(self, result: list):
@@ -128,6 +140,12 @@ class dbExport:
         elif self.Combo.get() == "Oracle 21c":
             for row in result:
                 row_to_list.append(row[0])
+        elif self.Combo.get() == "MySQL Server":
+            for row in result:
+                row_to_list.append(row.column_name)
+        elif self.Combo.get() == "PostgreSQL Server":
+            for row in result:
+                row_to_list.append(row.column_name)
         return row_to_list
 
     def convertCursorRowToListForDataType(self, result: list):
@@ -139,6 +157,12 @@ class dbExport:
         elif self.Combo.get() == "Oracle 21c":
             for row in result:
                 row_to_list.append(row[0])
+        elif self.Combo.get() == "MySQL Server":
+            for row in result:
+                row_to_list.append(row.data_type)
+        elif self.Combo.get() == "PostgreSQL Server":
+            for row in result:
+                row_to_list.append(row.data_type)
         return row_to_list
 
     def getTableRecordSet(self):
@@ -150,6 +174,13 @@ class dbExport:
         elif self.Combo.get() == "Oracle 21c":
             cursor.execute(
                 'SELECT trim(upper(table_name)) as table_name FROM ALL_TABLES WHERE OWNER  = \'' + self.schemaName + '\'')
+        elif self.Combo.get() == "MySQL Server":
+            cursor.execute('SELECT trim(upper(table_name)) as table_name FROM information_schema.tables where '
+                           'upper(table_schema) = ? ', self.schemaName)
+        elif self.Combo.get() == "PostgreSQL Server":
+            cursor.execute('SELECT trim(upper(table_name)) as table_name FROM information_schema.tables where '
+                           'table_type = \'BASE TABLE\' and upper(table_schema) = \'PUBLIC\' and upper(table_catalog) '
+                           '= ? ', self.schemaName)
         result = cursor.fetchall()
         cursor.close()
         return result
@@ -163,6 +194,15 @@ class dbExport:
         elif self.Combo.get() == "Oracle 21c":
             cursor.execute('SELECT upper(column_name) as column_name FROM all_tab_columns '
                            'where upper(owner) = \'' + self.schemaName + '\' and trim(upper(table_name)) = \'' + tbl_name + '\'')
+        elif self.Combo.get() == "MySQL Server":
+            cursor.execute('SELECT upper(column_name) as column_name FROM information_schema.columns '
+                           'where upper(table_schema) = ? and trim(upper(table_name)) = ? order by ordinal_position',
+                           self.schemaName, tbl_name)
+        elif self.Combo.get() == "PostgreSQL Server":
+            cursor.execute('SELECT upper(column_name) as column_name FROM information_schema.columns '
+                           'where table_schema=\'public\' and upper(table_catalog) = ? and trim(upper(table_name)) = '
+                           '? order by ordinal_position',
+                           self.schemaName, tbl_name)
         result = cursor.fetchall()
         cursor.close()
         return result
@@ -176,10 +216,18 @@ class dbExport:
         elif self.Combo.get() == "Oracle 21c":
             cursor.execute('SELECT upper(data_type) as data_type FROM all_tab_columns '
                            'where upper(owner) = \'' + self.schemaName + '\' and trim(upper(table_name)) = \'' + tbl_name + '\'')
+        elif self.Combo.get() == "MySQL Server":
+            cursor.execute('SELECT upper(data_type) as data_type FROM information_schema.columns '
+                           'where upper(table_schema) = ? and trim(upper(table_name)) = ? order by ordinal_position',
+                           self.schemaName, tbl_name)
+        elif self.Combo.get() == "PostgreSQL Server":
+            cursor.execute('SELECT upper(data_type) as data_type FROM information_schema.columns '
+                           'where table_schema=\'public\' and upper(table_catalog) = ? and trim(upper(table_name)) = '
+                           '? order by ordinal_position',
+                           self.schemaName, tbl_name)
         result = cursor.fetchall()
         cursor.close()
         return result
-
     def getColumnRecordSet(self):
         table_type = 'BASE TABLE'
         allddl: str = ''
@@ -203,12 +251,21 @@ class dbExport:
     def getConnection(self, dataSrc: str):
         if self.Combo.get() == "MSSQL Server 2022":
             ConnectionString = (
-                "DRIVER={ODBC Driver 18 for SQL Server};SERVER=127.0.0.1;UID=sa;PWD=P@ssw0rd"
+                "DRIVER={ODBC Driver 18 for MSSQL Server};SERVER=127.0.0.1;UID=sa;PWD=P@ssw0rd"
                 ";TrustServerCertificate=yes;")
             return pyodbc.connect(ConnectionString)
         elif self.Combo.get() == "Oracle 21c":
-            return cx_Oracle.connect("system/S0m0$hr33@192.168.29.58")
+            return cx_Oracle.connect("system/S0m0$hr33@192.168.29.234")
             # return cx_Oracle.connect("system/S0m0shr33@192.168.29.234")
+        elif self.Combo.get() == "MySQL Server":
+            ConnectionString = (
+                "DRIVER={MySQL ODBC 8.2 Unicode Driver}; SERVER=192.168.29.127;DATABASE=greendb; UID=neel; "
+                "PASSWORD=P@ssw0rd;")
+        elif self.Combo.get() == "PostgreSQL Server":
+            ConnectionString = (
+                "DRIVER=/usr/local/lib/psqlodbcw.so;SERVER=192.168.29.127;DATABASE=greendb;UID=postgres;PASSWORD=P"
+                "@ssw0rd;")
+        return pyodbc.connect(ConnectionString)
 
         # elif Combo.get() == "PostgresSQL": conn = psycopg2.connect(host="localhost",port=5433,database="your_database",
         # user="your_username",password="your_password")
@@ -220,6 +277,10 @@ class dbExport:
             cursor.execute('SELECT ' + colNames + ' FROM ' + self.schemaName + '..' + table_name)
         elif self.Combo.get() == "Oracle 21c":
             cursor.execute('SELECT ' + colNames + ' FROM ' + self.schemaName + '.' + table_name)
+        elif self.Combo.get() == "MySQL Server":
+            cursor.execute('SELECT ' + colNames + ' FROM ' + self.schemaName.lower() + '.' + table_name.lower())
+        elif self.Combo.get() == "PostgreSQL Server":
+            cursor.execute('SELECT * FROM ' + self.schemaName.lower() + '.public.' + table_name.lower())
         result = cursor.fetchall()
         cursor.close()
         return result
@@ -237,6 +298,13 @@ class dbExport:
                 for table_name in tbllist:
                     sqlStr += 'select count(*) as cnt from ' + self.schemaName + '.' + table_name + ' UNION '
                 sqlStr += 'select 0 from dual) tbl'
+            elif self.Combo.get() == "MySQL Server":
+                for table_name in tbllist:
+                    sqlStr += 'select count(*) as cnt from ' + self.schemaName + '.' + table_name + ' UNION '
+            elif self.Combo.get() == "PostgreSQL Server":
+                for table_name in tbllist:
+                    sqlStr += 'select count(*) as cnt from ' + self.schemaName + '.PUBLIC.' + table_name + ' UNION '
+                sqlStr += 'select 0) tbl'
             cursor.execute(sqlStr)
             result = cursor.fetchall()
             cursor.close()
@@ -372,14 +440,14 @@ class dbExport:
                 header: str = ''
                 record: str = ''
                 for col in columnNames:
-                    header += (col + ',')
+                    header += (col + '~')
                 file1.writelines(header[:-1] + '\n')
                 for row1 in result1:
                     r = r + 1
                     c = 1
                     line: str = ''
                     for x in row1:
-                        line += (str(x) + ',')
+                        line += (str(x) + '~')
                         c += 1
                     file1.writelines(line[:-1] + '\n')
                     self.pb['value'] += 1
@@ -404,11 +472,17 @@ class dbExport:
             cursor.execute('SELECT distinct upper(name) as dbname FROM sys.databases')
         elif self.Combo.get() == "Oracle 21c":
             cursor.execute('SELECT distinct upper(USERNAME) as dbname FROM ALL_USERS WHERE ORACLE_MAINTAINED=\'N\'')
+        elif self.Combo.get() == "MySQL Server":
+            cursor.execute('SELECT distinct upper(SCHEMA_NAME) as dbname FROM INFORMATION_SCHEMA.SCHEMATA WHERE '
+                           'schema_name not in (\'information_schema\',\'performance_schema\',\'sys\')')
+        elif self.Combo.get() == "PostgreSQL Server":
+            cursor.execute('SELECT distinct upper(CATALOG_NAME) as dbname FROM INFORMATION_SCHEMA.SCHEMATA WHERE '
+                           'schema_name in (\'public\')')
         result = cursor.fetchall()
         self.schemaCombo['values'] = self.convertCursorRowToListForSchema(result)
         cursor.close()
 
-
 root = Tk()
 dbExport(root)
+print(pyodbc.drivers())
 root.mainloop()
