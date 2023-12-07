@@ -174,7 +174,7 @@ class YoutubeBukDownloader:
         beautiful_soup = BeautifulSoup(content, "html.parser")
         channel_Id = beautiful_soup.find('meta', {'itemprop':'identifier'})        
         # Replace 'YOUR_API_KEY' with the actual API key
-        API_KEY = 'AIzaSyDNZXqQV8tgQcHyb4ArJZPzOpfPkEx01Y0'
+        API_KEY = 'XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX' 
         youtube = build('youtube', 'v3', developerKey=API_KEY)
 
         # Replace 'CHANNEL_ID' with the ID of the YouTube channel
