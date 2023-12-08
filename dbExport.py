@@ -1,26 +1,31 @@
 # ! /usr/bin/env python3
 import os
-from tkinter.ttk import *
-
+import sys
 import cx_Oracle
+#ODBC driver for ODBC connection to MSSQL, MySQL and Postgresql
 from pyodbc import Cursor
-# import psycopg2
 import pyodbc
-import openpyxl.workbook
-from openpyxl import Workbook
+#Python Excel Workbook API
+import openpyxl
+from openpyxl.workbook import Workbook
+#Python Excel Worksheet API
+from openpyxl.worksheet.worksheet import Worksheet
+#Tkinter GUI library API
 from tkinter.messagebox import showinfo
 from tkinter.simpledialog import askinteger
+from tkinter.ttk import *
 from tkinter import *
 
+#Python Excel Workbook styles API
 from openpyxl.styles import Font
 from openpyxl.styles.borders import Border, Side
-from openpyxl.worksheet.worksheet import Worksheet
-
 
 # from pyodbc import Connection, IntegrityError
+# import psycopg2
 
+#Python Oracle database connection API
+from cx_Oracle import *
 
-# import cxOracle
 
 # from pyodbc import *
 
@@ -34,29 +39,36 @@ class dbExport:
         # self.conn: Connection = None
         # self.tableList: list
 
+        # Frame which contain Combobox for Selecting type of database for export
         srvFrame = LabelFrame(self.root, text="List of Database Servers", font=("Arial", 12, "bold"), bg="#4d65a3",
-                              fg="white",
-                              bd=5, relief=GROOVE)
+                              fg="white", bd=5, relief=GROOVE)
         srvFrame.place(x=0, y=0, width=400, height=50)
-        self.Combo = Combobox(srvFrame, width=27, textvariable=StringVar(), values=['MSSQL Server 2022', 'Oracle 21c', 'MySQL Server', 'PostgreSQL Server'])
+        self.Combo = Combobox(srvFrame, width=27, textvariable=StringVar(),
+                              values=['MSSQL Server 2022', 'Oracle 21c', 'MySQL Server', 'PostgreSQL Server'])
+        # Combobox for Selecting type of database for export
         self.Combo.set("")
         self.Combo.bind('<<ComboboxSelected>>', self.getAllSchemas)
         self.Combo.pack(side=TOP, fill=Y)
 
+        # Frame which contain Combobox for Selecting schemas of database for export
         schemaFrame = LabelFrame(self.root, text="List of Schemas", font=("Arial", 12, "bold"), bg="#0f6751",
                                  fg="white",
                                  bd=5, relief=GROOVE)
         schemaFrame.place(x=0, y=55, width=400, height=60)
+        # Combobox for Selecting schemas of database for export
         self.schemaCombo = Combobox(schemaFrame, width=27, textvariable=StringVar(),
                                     values=[''])
         self.schemaCombo.set("")
         self.schemaCombo.bind('<<ComboboxSelected>>', self.getAllTables)
         self.schemaCombo.pack(side=TOP, fill=Y)
 
+        # Frame which contain Button for exporting tables of a selected schema of database to Excel
         buttonExcelFrame = LabelFrame(self.root, text="Export to Excel", font=("arial", 12, "bold"), bg="#df7d44",
                                       fg="white",
                                       bd=5, relief=GROOVE)
         buttonExcelFrame.place(x=0, y=120, width=200, height=60)
+
+        # Button for exporting tables of a selected schema of database to Excel
         self.exportExcelBtn = Button(buttonExcelFrame, text="Export", command=lambda: self.exportToExcel(), width=14,
                                      height=2,
                                      font=("arial", 14, "bold"),
@@ -65,10 +77,13 @@ class dbExport:
         self.exportExcelBtn.pack()
         self.exportExcelBtn["state"] = DISABLED
 
+        # Frame which contain Button for exporting tables of a selected schema of database to CSV
         buttonCSVFrame = LabelFrame(self.root, text="Export to CSV", font=("arial", 12, "bold"), bg="#df7d44",
                                     fg="white",
                                     bd=5, relief=GROOVE)
         buttonCSVFrame.place(x=205, y=120, width=200, height=60)
+
+        #Button for exporting tables of a selected schema of database to CSV
         self.exportCSVBtn = Button(buttonCSVFrame, text="Export", command=lambda: self.exportToCSV(), width=14,
                                    height=2,
                                    font=("arial", 14, "bold"),
@@ -77,26 +92,38 @@ class dbExport:
         self.exportCSVBtn.pack()
         self.exportCSVBtn["state"] = DISABLED
 
+        # Frame which contain ProgressBar showing tables export progress of a selected schema of database
         pbframe = LabelFrame(self.root, text="", font=("arial", 12, "bold"), bg="#8F00FF", fg="white",
                              bd=5, relief=GROOVE)
         pbframe.place(x=0, y=200, width=400, height=40)
+
+        #ProgressBar showing tables export progress of a selected schema of database
         self.pb = Progressbar(pbframe, orient='horizontal', mode='determinate', length=280)
         # self.pb.grid(column=0, row=0, columnspan=2, padx=20, pady=40)
         self.pb.pack()
         self.pb['value'] = 0
+        
+        # Frame which contain ProgressBar showing tables export progress of a selected schema of database
         tblListframe = LabelFrame(self.root, text="List of Tables", font=("arial", 12, "bold"), bg="#8F00FF",
                                   fg="white",
                                   bd=5, relief=GROOVE)
         tblListframe.place(x=450, y=0, width=400, height=200)
+
+        #Vertical Scrollbar for schema tables listbox
         scroll_y = Scrollbar(tblListframe, orient=VERTICAL)
+
+        #Database Schema tables listbox
         self.LB = Listbox(tblListframe, yscrollcommand=scroll_y.set, selectbackground="#8d8df6", selectmode=EXTENDED,
                           font=("arial", 12, "bold"), bg="#c9f56f", fg="navyblue", bd=5, relief=GROOVE)
-        scroll_y.config(command=self.LB.yview)
-        scroll_y.pack(side=RIGHT, fill=Y)
         self.LB.bind('<<ListboxSelect>>', self.items_selected)
         self.LB.pack(fill=BOTH)
+
+        #Vertical Scrollbar configuration for schema tables listbox
+        scroll_y.config(command=self.LB.yview)
+        scroll_y.pack(side=RIGHT, fill=Y)
         self.LB['state'] = DISABLED
 
+    #Converting Row Cursor to List object for table names
     def convertCursorRowToListForTable(self, result: list):
         row_to_list = []
         # result1 = [list(rows) for rows in result]
@@ -114,6 +141,8 @@ class dbExport:
                 row_to_list.append(row.table_name)
         return row_to_list
 
+
+    #Converting Row Cursor to List object for schema names
     def convertCursorRowToListForSchema(self, result: list):
         row_to_list = []
         # result1 = [list(rows) for rows in result]
@@ -131,6 +160,7 @@ class dbExport:
                 row_to_list.append(row.dbname)
         return row_to_list
 
+    #Converting Row Cursor to List object for column names
     def convertCursorRowToListForColumn(self, result: list):
         row_to_list = []
         # result1 = [list(rows) for rows in result]
@@ -148,6 +178,7 @@ class dbExport:
                 row_to_list.append(row.column_name)
         return row_to_list
 
+    #Converting Row Cursor to List object for column datatypes
     def convertCursorRowToListForDataType(self, result: list):
         row_to_list = []
         # result1 = [list(rows) for rows in result]
@@ -165,6 +196,7 @@ class dbExport:
                 row_to_list.append(row.data_type)
         return row_to_list
 
+    #Retrieving table name in recordsets
     def getTableRecordSet(self):
         cursor: Cursor = self.conn.cursor()
         if self.Combo.get() == "MSSQL Server 2022":
@@ -185,6 +217,7 @@ class dbExport:
         cursor.close()
         return result
 
+    #Retrieving column names in recordsets
     def getColumnnNameForTable(self, tbl_name: str):
         cursor: Cursor = self.conn.cursor()
         if self.Combo.get() == "MSSQL Server 2022":
@@ -207,6 +240,7 @@ class dbExport:
         cursor.close()
         return result
 
+    #Retrieving column datatypes for table in recordsets
     def getColumnnDataTypeForTable(self, tbl_name: str):
         cursor = self.conn.cursor()
         if self.Combo.get() == "MSSQL Server 2022":
@@ -228,48 +262,51 @@ class dbExport:
         result = cursor.fetchall()
         cursor.close()
         return result
-    def getColumnRecordSet(self):
-        table_type = 'BASE TABLE'
-        allddl: str = ''
-        cursor = self.conn.cursor()
-        if self.Combo.get() == "MSSQL Server 2022":
-            cursor.execute('SELECT upper(table_name) table_name,upper(column_name) column_name,'
-                           'upper(data_type) data_type,upper(is_nullable) is_nullable,'
-                           'character_maximum_length,numeric_precision,numeric_scale '
-                           'FROM information_schema.columns '
-                           'where trim(upper(table_name)) in (?) order by table_name, ordinal_position', self.tableList)
-        elif self.Combo.get() == "Oracle 21c":
-            cursor.execute('SELECT upper(table_name) table_name,upper(column_name) column_name,'
-                           'upper(data_type) data_type,upper(nullable) is_nullable,'
-                           'data_length,data_precision,data_scale '
-                           'FROM user_tab_columns '
-                           'where trim(upper(table_name)) in (?) order by table_name, column_id', self.tableList)
-        result = cursor.fetchall()
-        cursor.close()
-        return result
 
+    # #Retrieving column names in recordsets
+    # def getColumnRecordSet(self):
+    #     table_type = 'BASE TABLE'
+    #     allddl: str = ''
+    #     cursor = self.conn.cursor()
+    #     if self.Combo.get() == "MSSQL Server 2022":
+    #         cursor.execute('SELECT upper(table_name) table_name,upper(column_name) column_name,'
+    #                        'upper(data_type) data_type,upper(is_nullable) is_nullable,'
+    #                        'character_maximum_length,numeric_precision,numeric_scale '
+    #                        'FROM information_schema.columns '
+    #                        'where trim(upper(table_name)) in (?) order by table_name, ordinal_position', self.tableList)
+    #     elif self.Combo.get() == "Oracle 21c":
+    #         cursor.execute('SELECT upper(table_name) table_name,upper(column_name) column_name,'
+    #                        'upper(data_type) data_type,upper(nullable) is_nullable,'
+    #                        'data_length,data_precision,data_scale '
+    #                        'FROM user_tab_columns '
+    #                        'where trim(upper(table_name)) in (?) order by table_name, column_id', self.tableList)
+    #     result = cursor.fetchall()
+    #     cursor.close()
+    #     return result
+
+    #Create database connection
     def getConnection(self, dataSrc: str):
         if self.Combo.get() == "MSSQL Server 2022":
             ConnectionString = (
-                "DRIVER={ODBC Driver 18 for MSSQL Server};SERVER=127.0.0.1;UID=sa;PWD=P@ssw0rd"
+                "DRIVER={ODBC Driver 18 for MSSQL Server};SERVER=127.0.0.1;UID=sa;PWD=xxxxxxxx"
                 ";TrustServerCertificate=yes;")
             return pyodbc.connect(ConnectionString)
         elif self.Combo.get() == "Oracle 21c":
-            return cx_Oracle.connect("system/S0m0$hr33@192.168.29.234")
-            # return cx_Oracle.connect("system/S0m0shr33@192.168.29.234")
+            return cx_Oracle.connect("system/xxxxxxxx@192.168.29.234")
         elif self.Combo.get() == "MySQL Server":
             ConnectionString = (
                 "DRIVER={MySQL ODBC 8.2 Unicode Driver}; SERVER=192.168.29.127;DATABASE=greendb; UID=neel; "
-                "PASSWORD=P@ssw0rd;")
+                "PASSWORD=xxxxxxxx;")
         elif self.Combo.get() == "PostgreSQL Server":
             ConnectionString = (
-                "DRIVER=/usr/local/lib/psqlodbcw.so;SERVER=192.168.29.127;DATABASE=greendb;UID=postgres;PASSWORD=P"
-                "@ssw0rd;")
+                "DRIVER=/usr/local/lib/psqlodbcw.so;SERVER=192.168.29.127;DATABASE=greendb;UID=postgres;PASSWORD=x"
+                "xxxxxxx;")
         return pyodbc.connect(ConnectionString)
 
         # elif Combo.get() == "PostgresSQL": conn = psycopg2.connect(host="localhost",port=5433,database="your_database",
         # user="your_username",password="your_password")
 
+    #Retrieving all records of a particular table in recordsets
     def getTableRecords(self, table_name: str, columnNames: list):
         cursor = self.conn.cursor()
         colNames: str = ','.join(columnNames)
@@ -280,11 +317,12 @@ class dbExport:
         elif self.Combo.get() == "MySQL Server":
             cursor.execute('SELECT ' + colNames + ' FROM ' + self.schemaName.lower() + '.' + table_name.lower())
         elif self.Combo.get() == "PostgreSQL Server":
-            cursor.execute('SELECT * FROM ' + self.schemaName.lower() + '.public.' + table_name.lower())
+            cursor.execute('SELECT  ' + colNames.lower() + '  FROM ' + self.schemaName.lower() + '.public.' + table_name.lower())
         result = cursor.fetchall()
         cursor.close()
         return result
 
+    #Retrieving all table records count for progressbar max value
     def getTotTableRecordsCount(self):
         if self.tableList != "":
             cursor = self.conn.cursor()
@@ -300,10 +338,11 @@ class dbExport:
                 sqlStr += 'select 0 from dual) tbl'
             elif self.Combo.get() == "MySQL Server":
                 for table_name in tbllist:
-                    sqlStr += 'select count(*) as cnt from ' + self.schemaName + '.' + table_name + ' UNION '
+                    sqlStr += 'select count(*) as cnt from ' + self.schemaName.lower() + '.' + table_name.lower() + ' UNION '
+                sqlStr += 'select 0) tbl'
             elif self.Combo.get() == "PostgreSQL Server":
                 for table_name in tbllist:
-                    sqlStr += 'select count(*) as cnt from ' + self.schemaName + '.PUBLIC.' + table_name + ' UNION '
+                    sqlStr += 'select count(*) as cnt from ' + self.schemaName + '.PUBLIC.' + table_name.lower() + ' UNION '
                 sqlStr += 'select 0) tbl'
             cursor.execute(sqlStr)
             result = cursor.fetchall()
@@ -311,24 +350,14 @@ class dbExport:
             for row in result:
                 return row.totcount if self.Combo.get() == "MSSQL Server 2022" else row[0]
 
-    # def addCheckBoxToListBox(self, frame: Frame, LB: Listbox, list_for_listbox: list):
-    #     enable = []
-    #     i = 1
-    #     for item in list_for_listbox:
-    #         enable.append("button " + str(i))
-    #         i = i + 1
-    #     for item in list_for_listbox:
-    #         for y in enable:
-    #             globals()["var{}{}".format(item, y)] = BooleanVar()
-    #             globals()["checkbox{}{}".format(item, y)] = Checkbutton(frame, text=y,
-    #                                                                     variable=globals()["var{}{}".format(item, y)])
-
+    #Adding tables to listbox from table list of tables.
     def addTableToListBox(self, result: list):
         self.LB['state'] = NORMAL
         self.LB.delete(0, END)
         for item in result:
             self.LB.insert(END, item)
 
+    #Creating array of table names reading user click event of table listbox
     def items_selected(self, event):
         # get selected indices
         selected_indices = self.LB.curselection()
@@ -343,6 +372,7 @@ class dbExport:
             self.exportExcelBtn['state'] = DISABLED
             self.exportCSVBtn['state'] = DISABLED
 
+    #Retrieving the column index of excel column 
     def getExcelColumnIndex(self, columnIndex: int) -> str:
         if int((columnIndex - 1) / 26) > 0:
             s = chr(64 + int(columnIndex / 26))
@@ -350,6 +380,7 @@ class dbExport:
             s = ''
         return s + chr(65 + ((columnIndex - 1) % 26))
 
+    #Resizing excel column to maximum width
     def resizeCells(self, ws: Worksheet):
         for col in ws.columns:
             SetLen = 0
@@ -360,6 +391,7 @@ class dbExport:
             # Setting the column width
             ws.column_dimensions[column].width = SetLen + 5
 
+    #Exporting table dsta to excel to individual sheets as table name
     def exportToExcel(self):
         # result = getTableRecordSet(conn)
         if self.tableList != "":
@@ -370,7 +402,6 @@ class dbExport:
                                  top=Side(style='thin'),
                                  bottom=Side(style='thin'))
             self.pb['maximum'] = self.getTotTableRecordsCount()
-            self.pb.start()
             self.pb['value'] = 0
             self.pb.start()
             for table_name in tbllist:
@@ -399,13 +430,14 @@ class dbExport:
                     self.root.update_idletasks()
                 self.resizeCells(ws)
             self.pb.stop()
-            wb.save(self.schemaName + ".xlsx")
+            wb.save(self.schemaName + "-" + self.Combo.get() + ".xlsx")
             message = f'Export completed successfully for  {self.Combo.get()}!'
             self.exportExcelBtn['state'] = DISABLED
             self.exportCSVBtn['state'] = DISABLED
 
+    #Make runtime directory
     def makeDirectory(self):
-        directory = self.schemaName
+        directory = self.schemaName + "-" + self.Combo.get()
         # Parent Directory path
         parent_dir = "./"
         # Path
@@ -416,6 +448,7 @@ class dbExport:
             print(error)
         return path
 
+    #Exporting table dsta to csv to individual files as table name
     def exportToCSV(self):
         # result = getTableRecordSet(conn)
         if self.tableList != "":
@@ -458,6 +491,7 @@ class dbExport:
             self.exportExcelBtn['state'] = DISABLED
             self.exportCSVBtn['state'] = DISABLED
 
+    #Adding database schema tables to listbox from table recordset
     def getAllTables(self, event):
         # self.conn = self.getConnection(self.Combo.get())
         self.schemaName = self.schemaCombo.get()
@@ -465,6 +499,7 @@ class dbExport:
         self.addTableToListBox(result)
         self.LB.pack(expand=True, fill=BOTH, side=LEFT)
 
+    #Adding database schemas to listbox from table recordset
     def getAllSchemas(self, event):
         self.conn = self.getConnection(self.Combo.get())
         cursor: Cursor = self.conn.cursor()
@@ -482,7 +517,7 @@ class dbExport:
         self.schemaCombo['values'] = self.convertCursorRowToListForSchema(result)
         cursor.close()
 
+
 root = Tk()
 dbExport(root)
-print(pyodbc.drivers())
 root.mainloop()
